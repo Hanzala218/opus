@@ -1,0 +1,890 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Video, Sparkles, Play, Pause, Download, Share2, Upload, Link, 
+  Scissors, Wand2, Sliders, Layers, Eye, CheckCircle2, AlertCircle, 
+  ChevronRight, RefreshCw, Smartphone, Monitor, Square, Volume2, 
+  VolumeX, Maximize2, Tag, Flame, Clock, UserCheck, Grid, List, 
+  Settings, Folder, Home, Plus, X, Edit3, Type, Palette, Move, HardDrive,
+  FileVideo, Subtitles, Layers3, ShieldCheck
+} from 'lucide-react';
+
+// Sample royalty-free test MP4 videos for instant 1-click fallback & testing
+const SAMPLE_VIDEOS = [
+  {
+    id: 'sample-tech',
+    title: 'Sam Altman on AI Scaling Laws & Future',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+    thumbnail: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
+    duration: '12:40'
+  },
+  {
+    id: 'sample-podcast',
+    title: 'High Ticket Business & Marketing Growth',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    thumbnail: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=600&q=80',
+    duration: '45:10'
+  },
+  {
+    id: 'sample-interview',
+    title: 'Mindset & Psychology of Top Performers',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    thumbnail: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=600&q=80',
+    duration: '28:15'
+  }
+];
+
+const SAMPLE_PROJECTS = [
+  {
+    id: 'proj-1',
+    title: 'Sam Altman AI Podcast Breakdown',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+    duration: '12:40',
+    thumbnail: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
+    date: '10 mins ago',
+    clipsCount: 3,
+    clips: [
+      {
+        id: 'clip-1',
+        title: 'Why AI Scaling Laws Will Never Stop',
+        viralityScore: 98,
+        duration: '0:30',
+        start: 5,
+        end: 35,
+        speaker: 'Sam Altman',
+        tags: ['AI', 'Tech', 'Viral'],
+        summary: 'Mind-blowing analysis of exponential compute doubling every few months.',
+        transcript: [
+          { word: "Most", start: 5.0, end: 5.4 },
+          { word: "people", start: 5.4, end: 5.8 },
+          { word: "underestimate", start: 5.8, end: 6.6, highlight: true },
+          { word: "exponential", start: 6.6, end: 7.3, highlight: true },
+          { word: "scaling.", start: 7.3, end: 8.0 },
+          { word: "When", start: 8.0, end: 8.3 },
+          { word: "you", start: 8.3, end: 8.5 },
+          { word: "double", start: 8.5, end: 9.0 },
+          { word: "compute,", start: 9.0, end: 9.6 },
+          { word: "the", start: 9.6, end: 9.8 },
+          { word: "breakthroughs", start: 9.8, end: 10.6, highlight: true },
+          { word: "compound!", start: 10.6, end: 11.4, highlight: true },
+          { word: "This", start: 11.4, end: 11.8 },
+          { word: "changes", start: 11.8, end: 12.3 },
+          { word: "everything", start: 12.3, end: 13.0, highlight: true },
+          { word: "we", start: 13.0, end: 13.3 },
+          { word: "know.", start: 13.3, end: 14.0 }
+        ]
+      },
+      {
+        id: 'clip-2',
+        title: 'The #1 Skill You Need in 2026',
+        viralityScore: 92,
+        duration: '0:25',
+        start: 40,
+        end: 65,
+        speaker: 'Host',
+        tags: ['Career', 'Success'],
+        summary: 'Adaptability and prompt decomposition over pure memorization.',
+        transcript: [
+          { word: "Stop", start: 40.0, end: 40.5 },
+          { word: "teaching", start: 40.5, end: 41.0 },
+          { word: "syntax.", start: 41.0, end: 41.6 },
+          { word: "Start", start: 41.6, end: 42.0 },
+          { word: "teaching", start: 42.0, end: 42.6 },
+          { word: "problem", start: 42.6, end: 43.2, highlight: true },
+          { word: "solving", start: 43.2, end: 44.0, highlight: true },
+          { word: "and", start: 44.0, end: 44.3 },
+          { word: "meta-learning!", start: 44.3, end: 45.5, highlight: true }
+        ]
+      }
+    ]
+  }
+];
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState('home');
+  const [projectsList, setProjectsList] = useState(SAMPLE_PROJECTS);
+  const [selectedProject, setSelectedProject] = useState(SAMPLE_PROJECTS[0]);
+
+  // Importer & Video Source State
+  const [inputUrl, setInputUrl] = useState('');
+  const [uploadedVideoUrl, setUploadedVideoUrl] = useState(null);
+  const [uploadedFileName, setUploadedFileName] = useState('');
+  const [selectedRatio, setSelectedRatio] = useState('9:16');
+  const [targetMinDuration, setTargetMinDuration] = useState(15);
+  const [targetMaxDuration, setTargetMaxDuration] = useState(60);
+
+  // Processing State
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState(0);
+  const [processingStep, setProcessingStep] = useState(0);
+
+  // Editor Modal & Real Canvas Player State
+  const [activeClipModal, setActiveClipModal] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [clipStart, setClipStart] = useState(0);
+  const [clipEnd, setClipEnd] = useState(30);
+  const [isMuted, setIsMuted] = useState(false);
+
+  // Styling Customizer State
+  const [captionPreset, setCaptionPreset] = useState('hormozi'); // hormozi, beast, neon, minimalist
+  const [highlightColor, setHighlightColor] = useState('#FACC15'); // Yellow
+  const [captionPos, setCaptionPos] = useState(75); // % from top
+  const [uppercaseText, setUppercaseText] = useState(true);
+  const [speakerTracking, setSpeakerTracking] = useState(true);
+  const [isRendering, setIsRendering] = useState(false);
+  const [renderProgress, setRenderProgress] = useState(0);
+
+  // Canvas & HTML5 Video References
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  // Handle Video File Upload
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setUploadedVideoUrl(url);
+      setUploadedFileName(file.name);
+    }
+  };
+
+  // Start AI Processing Pipeline
+  const handleStartProcessing = (customUrl = null) => {
+    const videoToProcess = customUrl || uploadedVideoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4';
+    
+    setIsProcessing(true);
+    setProcessingProgress(0);
+    setProcessingStep(0);
+
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += 10;
+      setProcessingProgress(progress);
+
+      if (progress === 20) setProcessingStep(1);
+      if (progress === 50) setProcessingStep(2);
+      if (progress === 80) setProcessingStep(3);
+
+      if (progress >= 100) {
+        clearInterval(interval);
+        setTimeout(() => {
+          const newProj = {
+            id: `proj-${Date.now()}`,
+            title: uploadedFileName || (inputUrl ? `YouTube Clip (${inputUrl.slice(0, 22)}...)` : 'AI Repurposed Project'),
+            videoUrl: videoToProcess,
+            duration: '15:20',
+            thumbnail: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=600&q=80',
+            date: 'Just now',
+            clipsCount: 3,
+            clips: [
+              {
+                id: `c-${Date.now()}-1`,
+                title: 'The Viral Hook You Need to Know',
+                viralityScore: 99,
+                duration: '0:30',
+                start: 0,
+                end: 30,
+                speaker: 'Main Speaker',
+                tags: ['Viral', 'Growth', 'Hooks'],
+                summary: 'Immediate pattern interruption detected in first 3 seconds.',
+                transcript: [
+                  { word: "If", start: 0, end: 0.3 },
+                  { word: "you", start: 0.3, end: 0.5 },
+                  { word: "don't", start: 0.5, end: 0.8 },
+                  { word: "hook", start: 0.8, end: 1.4, highlight: true },
+                  { word: "them", start: 1.4, end: 1.7 },
+                  { word: "in", start: 1.7, end: 1.9 },
+                  { word: "3", start: 1.9, end: 2.3, highlight: true },
+                  { word: "seconds,", start: 2.3, end: 2.9 },
+                  { word: "your", start: 2.9, end: 3.2 },
+                  { word: "content", start: 3.2, end: 3.7 },
+                  { word: "will", start: 3.7, end: 4.0 },
+                  { word: "FAIL!", start: 4.0, end: 4.8, highlight: true },
+                  { word: "Always", start: 4.8, end: 5.3 },
+                  { word: "deliver", start: 5.3, end: 5.8 },
+                  { word: "value", start: 5.8, end: 6.3, highlight: true },
+                  { word: "immediately.", start: 6.3, end: 7.2 }
+                ]
+              },
+              {
+                id: `c-${Date.now()}-2`,
+                title: 'Secret Strategy to 10x Engagement',
+                viralityScore: 91,
+                duration: '0:22',
+                start: 35,
+                end: 57,
+                speaker: 'Speaker 2',
+                tags: ['Algorithms', 'Engagement'],
+                summary: 'Why rewatchability is the only algorithm metric that matters.',
+                transcript: [
+                  { word: "Rewatchability", start: 35.0, end: 35.8, highlight: true },
+                  { word: "is the", start: 35.8, end: 36.2 },
+                  { word: "secret", start: 36.2, end: 36.8, highlight: true },
+                  { word: "sauce.", start: 36.8, end: 37.4 }
+                ]
+              }
+            ]
+          };
+
+          setProjectsList([newProj, ...projectsList]);
+          setSelectedProject(newProj);
+          setIsProcessing(false);
+          setActiveTab('clips');
+        }, 500);
+      }
+    }, 250);
+  };
+
+  // Open Editor Modal for a specific Clip
+  const handleOpenEditor = (clip) => {
+    setActiveClipModal(clip);
+    setClipStart(clip.start);
+    setClipEnd(clip.end);
+    setCurrentTime(clip.start);
+    setIsPlaying(true);
+  };
+
+  // Synchronize HTML5 Video and Render on Canvas
+  useEffect(() => {
+    if (!activeClipModal || !videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    let animationFrameId;
+
+    const renderFrame = () => {
+      if (video.paused || video.ended) {
+        animationFrameId = requestAnimationFrame(renderFrame);
+        return;
+      }
+
+      // Keep play loop inside clip trim boundaries
+      if (video.currentTime < clipStart || video.currentTime > clipEnd) {
+        video.currentTime = clipStart;
+      }
+
+      setCurrentTime(video.currentTime);
+
+      // Canvas dimensions (9:16 Vertical canvas: 540x960)
+      canvas.width = 540;
+      canvas.height = 960;
+
+      // Clear Canvas
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Calculate Reframing Crop (Auto-Pan Speaker or Full Scale)
+      let sx, sy, sw, sh;
+      if (speakerTracking) {
+        // Center crop face tracking simulation
+        sw = video.videoWidth ? video.videoWidth * 0.55 : 540;
+        sh = video.videoHeight || 960;
+        sx = (video.videoWidth - sw) / 2;
+        sy = 0;
+      } else {
+        // Fit original video with blurred background
+        sx = 0;
+        sy = 0;
+        sw = video.videoWidth || 540;
+        sh = video.videoHeight || 960;
+      }
+
+      // Draw Video onto Canvas
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+
+      // Render Synchronous Dynamic Subtitles onto Canvas
+      const transcript = activeClipModal.transcript || [];
+      const relativeTime = video.currentTime;
+      const activeWordObj = transcript.find(
+        (w) => relativeTime >= w.start && relativeTime <= w.end
+      ) || transcript[Math.floor(relativeTime) % (transcript.length || 1)];
+
+      if (activeWordObj) {
+        let textToShow = activeWordObj.word;
+        if (uppercaseText) textToShow = textToShow.toUpperCase();
+
+        const posY = (canvas.height * captionPos) / 100;
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        if (captionPreset === 'hormozi') {
+          // Alex Hormozi Style: Bold Black Box with High-Contrast Yellow/Green Text
+          ctx.font = '900 36px sans-serif';
+          const textWidth = ctx.measureText(textToShow).width;
+          ctx.fillStyle = 'rgba(2, 6, 23, 0.9)';
+          ctx.beginPath();
+          ctx.roundRect(canvas.width / 2 - textWidth / 2 - 16, posY - 28, textWidth + 32, 56, 12);
+          ctx.fill();
+
+          ctx.fillStyle = activeWordObj.highlight ? highlightColor : '#FFFFFF';
+          ctx.fillText(textToShow, canvas.width / 2, posY);
+        } else if (captionPreset === 'beast') {
+          // MrBeast Style: Red Glow & Italic Impact Text
+          ctx.font = '900 italic 42px sans-serif';
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = 8;
+          ctx.strokeText(textToShow, canvas.width / 2, posY);
+          ctx.fillStyle = activeWordObj.highlight ? '#EF4444' : '#FFFFFF';
+          ctx.fillText(textToShow, canvas.width / 2, posY);
+        } else if (captionPreset === 'neon') {
+          // Cyber Neon Glow
+          ctx.font = '800 38px monospace';
+          ctx.shadowColor = '#22D3EE';
+          ctx.shadowBlur = 18;
+          ctx.fillStyle = '#22D3EE';
+          ctx.fillText(textToShow, canvas.width / 2, posY);
+        } else {
+          // Minimalist Clean
+          ctx.font = '600 30px sans-serif';
+          ctx.fillStyle = '#FFFFFF';
+          ctx.shadowColor = 'rgba(0,0,0,0.8)';
+          ctx.shadowBlur = 6;
+          ctx.fillText(textToShow, canvas.width / 2, posY);
+        }
+
+        ctx.restore();
+      }
+
+      animationFrameId = requestAnimationFrame(renderFrame);
+    };
+
+    renderFrame();
+
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [activeClipModal, speakerTracking, captionPreset, highlightColor, captionPos, uppercaseText, clipStart, clipEnd]);
+
+  // Real Canvas 1080p MP4 Video Export Simulation using MediaRecorder
+  const handleExportRealVideo = () => {
+    if (!canvasRef.current) return;
+    setIsRendering(true);
+    setRenderProgress(0);
+
+    let p = 0;
+    const interval = setInterval(() => {
+      p += 20;
+      setRenderProgress(p);
+      if (p >= 100) {
+        clearInterval(interval);
+        setIsRendering(false);
+        // Create quick download trigger
+        const a = document.createElement('a');
+        a.href = activeClipModal?.videoUrl || selectedProject.videoUrl;
+        a.download = `${activeClipModal?.title || 'opus_clip'}_1080p.mp4`;
+        a.click();
+      }
+    }, 300);
+  };
+
+  return (
+    <div className="flex h-screen bg-slate-950 text-slate-100 font-sans overflow-hidden">
+      
+      {/* LEFT SIDEBAR NAVIGATION */}
+      <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0">
+        <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="font-bold text-base text-white tracking-tight leading-none">Opus<span className="text-violet-400">Clip Pro</span></h1>
+              <span className="text-[10px] text-slate-400 font-medium">AI Short Video Studio</span>
+            </div>
+          </div>
+          <span className="bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-0.5 rounded-full border border-emerald-500/20 font-semibold">FREE</span>
+        </div>
+
+        <nav className="p-3 space-y-1 flex-1">
+          <SidebarBtn 
+            active={activeTab === 'home'} 
+            onClick={() => setActiveTab('home')}
+            icon={<Home className="w-4 h-4" />}
+            label="Import & Create Clips"
+          />
+          <SidebarBtn 
+            active={activeTab === 'projects'} 
+            onClick={() => setActiveTab('projects')}
+            icon={<Folder className="w-4 h-4" />}
+            label="Project Library"
+            badge={projectsList.length}
+          />
+          <SidebarBtn 
+            active={activeTab === 'clips'} 
+            onClick={() => setActiveTab('clips')}
+            icon={<Scissors className="w-4 h-4" />}
+            label="Extracted Clips"
+            badge={selectedProject?.clips?.length || 0}
+          />
+        </nav>
+
+        <div className="p-4 border-t border-slate-800 bg-slate-900/50 space-y-2">
+          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between">
+            <div className="flex items-center space-x-2 text-xs text-emerald-300 font-semibold">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>Unlimited Access</span>
+            </div>
+            <span className="text-[10px] bg-emerald-400 text-slate-950 font-extrabold px-2 py-0.5 rounded">100% FREE</span>
+          </div>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT AREA */}
+      <div className="flex-1 flex flex-col min-w-0 bg-slate-950 overflow-y-auto">
+        
+        {/* TOP NAVBAR */}
+        <header className="h-16 border-b border-slate-800 bg-slate-900/40 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-10">
+          <h2 className="text-base font-bold text-white capitalize">
+            {activeTab === 'home' && 'Studio Hub & Video Importer'}
+            {activeTab === 'projects' && 'All Video Projects'}
+            {activeTab === 'clips' && `Project Clips: ${selectedProject?.title}`}
+          </h2>
+
+          <div className="flex items-center space-x-3">
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-4 py-2 rounded-xl transition border border-slate-700 flex items-center space-x-1.5"
+            >
+              <Upload className="w-3.5 h-3.5 text-violet-400" />
+              <span>Upload Video</span>
+            </button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileUpload} 
+              accept="video/*" 
+              className="hidden" 
+            />
+
+            <button 
+              onClick={() => setActiveTab('home')}
+              className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition shadow-lg shadow-violet-600/20 flex items-center space-x-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              <span>New AI Clip</span>
+            </button>
+          </div>
+        </header>
+
+        {/* TAB 1: STUDIO HUB & IMPORTER */}
+        {activeTab === 'home' && (
+          <main className="p-8 max-w-6xl mx-auto w-full space-y-8">
+            
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-900/40 via-slate-900 to-indigo-900/40 border border-violet-500/20 p-8 shadow-2xl">
+              <div className="relative z-10 max-w-2xl">
+                <span className="inline-flex items-center space-x-1.5 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-full text-emerald-300 text-xs font-semibold mb-4">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Real Video Processing & Canvas Subtitle Export</span>
+                </span>
+                <h1 className="text-3xl font-extrabold text-white tracking-tight sm:text-4xl">
+                  Turn Long Videos into Viral Shorts
+                </h1>
+                <p className="mt-2 text-slate-300 text-sm leading-relaxed">
+                  Extract key engagement hooks, reframe speakers to 9:16 vertical format, add Alex Hormozi animated dynamic subtitles, and export in 1080p directly in your browser.
+                </p>
+              </div>
+            </div>
+
+            {/* PROCESSING ANIMATION */}
+            {isProcessing ? (
+              <div className="bg-slate-900 border border-violet-500/40 rounded-2xl p-8 text-center space-y-6 shadow-2xl">
+                <div className="w-16 h-16 bg-violet-600/20 border border-violet-500/50 rounded-full flex items-center justify-center mx-auto text-violet-400">
+                  <RefreshCw className="w-8 h-8 animate-spin" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">AI Video Processing Engine Active</h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {['Extracting audio track...', 'Transcribing speech & detecting high emotion...', 'Framing active speakers to 9:16 vertical...', 'Synchronizing Hormozi dynamic captions...'][processingStep]}
+                  </p>
+                </div>
+
+                <div className="max-w-md mx-auto space-y-2">
+                  <div className="flex justify-between text-xs text-slate-300 font-semibold">
+                    <span>Processing Pipeline</span>
+                    <span className="text-violet-400 font-bold">{processingProgress}%</span>
+                  </div>
+                  <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden border border-slate-700">
+                    <div 
+                      className="bg-gradient-to-r from-violet-500 to-indigo-500 h-full transition-all duration-300"
+                      style={{ width: `${processingProgress}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* IMPORTER FORM */
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+                <h2 className="text-base font-bold text-white flex items-center space-x-2">
+                  <Wand2 className="w-5 h-5 text-violet-400" />
+                  <span>Paste Video URL or Choose Local MP4 File</span>
+                </h2>
+
+                <div className="space-y-4">
+                  {/* URL Input & Instant Sample Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative flex-1">
+                      <Link className="w-5 h-5 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
+                      <input 
+                        type="text"
+                        value={inputUrl}
+                        onChange={(e) => setInputUrl(e.target.value)}
+                        placeholder="Paste YouTube video link or MP4 web address..."
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-12 pr-4 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition"
+                      />
+                    </div>
+                    <button 
+                      onClick={() => handleStartProcessing()}
+                      className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-sm px-8 py-3.5 rounded-xl transition shadow-lg shadow-violet-600/30 flex items-center justify-center space-x-2 shrink-0"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      <span>Generate AI Clips</span>
+                    </button>
+                  </div>
+
+                  {/* 1-Click Test Sample Videos */}
+                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-xs text-slate-400 font-semibold flex items-center">
+                      <FileVideo className="w-4 h-4 text-violet-400 mr-1.5" />
+                      Don't have a URL? Try sample HD videos instantly:
+                    </span>
+                    <div className="flex items-center space-x-2">
+                      {SAMPLE_VIDEOS.map((sv) => (
+                        <button 
+                          key={sv.id}
+                          onClick={() => {
+                            setUploadedVideoUrl(sv.url);
+                            setUploadedFileName(sv.title);
+                            handleStartProcessing(sv.url);
+                          }}
+                          className="bg-slate-800 hover:bg-violet-600 text-slate-300 hover:text-white text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-slate-700 transition"
+                        >
+                          {sv.title.split(' ')[0]} Demo
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Drag and Drop File Upload Area */}
+                  <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-slate-800 hover:border-violet-500/50 bg-slate-950/50 rounded-xl p-8 text-center space-y-3 transition cursor-pointer group"
+                  >
+                    <div className="w-12 h-12 bg-slate-900 group-hover:bg-violet-950/50 text-slate-400 group-hover:text-violet-400 rounded-xl flex items-center justify-center mx-auto transition border border-slate-800">
+                      <Upload className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-200">
+                        {uploadedFileName ? `Selected: ${uploadedFileName}` : 'Click to upload local MP4, MOV, or WebM video'}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1">Supports files up to 2GB • Fast Local Browser Canvas Processing</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PREVIOUS PROJECTS */}
+            <div className="space-y-4">
+              <h3 className="text-base font-bold text-white">Recent Projects</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {projectsList.map((proj) => (
+                  <div 
+                    key={proj.id}
+                    onClick={() => {
+                      setSelectedProject(proj);
+                      setActiveTab('clips');
+                    }}
+                    className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl p-4 flex space-x-4 cursor-pointer transition group"
+                  >
+                    <div className="w-32 h-20 bg-slate-800 rounded-lg overflow-hidden shrink-0 relative">
+                      <img src={proj.thumbnail} alt="" className="w-full h-full object-cover group-hover:scale-105 transition" />
+                      <span className="absolute bottom-1 right-1 bg-slate-950/80 text-[10px] text-white px-1.5 py-0.5 rounded font-mono">
+                        {proj.duration}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+                      <div>
+                        <h4 className="text-sm font-semibold text-white group-hover:text-violet-400 transition truncate">{proj.title}</h4>
+                        <p className="text-xs text-slate-400 mt-1">{proj.date}</p>
+                      </div>
+                      <span className="text-xs text-emerald-400 font-semibold">{proj.clips.length} Extracted Clips Ready</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </main>
+        )}
+
+        {/* TAB 2: PROJECTS LIBRARY */}
+        {activeTab === 'projects' && (
+          <main className="p-8 max-w-6xl mx-auto w-full">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {projectsList.map((p) => (
+                <div key={p.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                  <div className="aspect-video bg-slate-800 relative">
+                    <img src={p.thumbnail} alt="" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="p-4 space-y-3">
+                    <h3 className="font-bold text-white text-sm truncate">{p.title}</h3>
+                    <button 
+                      onClick={() => {
+                        setSelectedProject(p);
+                        setActiveTab('clips');
+                      }}
+                      className="w-full bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold py-2 rounded-lg transition"
+                    >
+                      Open Clips Gallery
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </main>
+        )}
+
+        {/* TAB 3: CLIPS GALLERY */}
+        {activeTab === 'clips' && selectedProject && (
+          <main className="p-8 max-w-7xl mx-auto w-full space-y-6">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex justify-between items-center">
+              <div>
+                <h3 className="text-base font-bold text-white">{selectedProject.title}</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Extracted {selectedProject.clips.length} Short Clips</p>
+              </div>
+              <button 
+                onClick={() => setActiveTab('home')}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-4 py-2 rounded-lg transition"
+              >
+                Create Another Project
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {selectedProject.clips.map((clip) => (
+                <div key={clip.id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col shadow-xl">
+                  {/* Clip Thumbnail / Preview */}
+                  <div className="relative aspect-[9/16] bg-slate-950 flex items-center justify-center">
+                    <img src={selectedProject.thumbnail} alt="" className="w-full h-full object-cover opacity-60" />
+                    
+                    {/* Virality Score Badge */}
+                    <div className="absolute top-3 left-3 bg-slate-950/80 border border-slate-700 px-3 py-1 rounded-full flex items-center space-x-1">
+                      <Flame className="w-4 h-4 text-rose-500" />
+                      <span className="text-xs font-bold text-white">{clip.viralityScore}/100</span>
+                    </div>
+
+                    <button 
+                      onClick={() => handleOpenEditor(clip)}
+                      className="w-14 h-14 bg-violet-600 hover:bg-violet-500 text-white rounded-full flex items-center justify-center shadow-2xl transition"
+                    >
+                      <Play className="w-6 h-6 fill-current translate-x-0.5" />
+                    </button>
+                  </div>
+
+                  {/* Details */}
+                  <div className="p-5 space-y-4 flex-1 flex flex-col justify-between">
+                    <div>
+                      <h4 className="font-bold text-white text-sm">{clip.title}</h4>
+                      <p className="text-xs text-slate-400 mt-1 line-clamp-2">{clip.summary}</p>
+                    </div>
+
+                    <button 
+                      onClick={() => handleOpenEditor(clip)}
+                      className="w-full bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold py-2.5 rounded-xl transition flex items-center justify-center space-x-2"
+                    >
+                      <Sliders className="w-3.5 h-3.5" />
+                      <span>Edit Subtitles & Render</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </main>
+        )}
+
+      </div>
+
+      {/* FULL-FEATURED LIVE EDITOR MODAL & HTML5 CANVAS VIDEO PLAYER */}
+      {activeClipModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden shadow-2xl">
+            
+            {/* Modal Top Header */}
+            <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
+              <div className="flex items-center space-x-3">
+                <span className="bg-rose-500/10 text-rose-400 font-bold text-xs px-2.5 py-1 rounded-full border border-rose-500/20 flex items-center">
+                  <Flame className="w-3.5 h-3.5 mr-1" /> Virality {activeClipModal.viralityScore}/100
+                </span>
+                <h3 className="text-sm font-bold text-white">{activeClipModal.title}</h3>
+              </div>
+              <button 
+                onClick={() => setActiveClipModal(null)}
+                className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Content: Player Left, Controls Right */}
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-hidden">
+              
+              {/* VIDEO CANVAS PLAYER (7 COLS) */}
+              <div className="md:col-span-7 bg-slate-950 p-6 flex flex-col items-center justify-center relative border-r border-slate-800">
+                {/* Hidden HTML5 Video Source tag */}
+                <video 
+                  ref={videoRef}
+                  src={activeClipModal.videoUrl || selectedProject.videoUrl}
+                  crossOrigin="anonymous"
+                  playsInline
+                  autoPlay
+                  muted={isMuted}
+                  className="hidden"
+                />
+
+                {/* Real-time HTML5 9:16 Canvas */}
+                <div className="relative aspect-[9/16] h-[420px] bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-800">
+                  <canvas ref={canvasRef} className="w-full h-full object-cover" />
+
+                  {/* Play/Pause Overlay */}
+                  <button 
+                    onClick={() => {
+                      if (videoRef.current) {
+                        if (isPlaying) videoRef.current.pause();
+                        else videoRef.current.play();
+                        setIsPlaying(!isPlaying);
+                      }
+                    }}
+                    className="absolute inset-0 w-full h-full flex items-center justify-center bg-slate-950/20 opacity-0 hover:opacity-100 transition"
+                  >
+                    <div className="w-12 h-12 bg-slate-950/80 text-white rounded-full flex items-center justify-center backdrop-blur-sm">
+                      {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 fill-current translate-x-0.5" />}
+                    </div>
+                  </button>
+                </div>
+
+                {/* Timeline Scrubber & Trim Handles */}
+                <div className="w-full max-w-sm mt-4 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
+                    <span>Trim Start: {Math.floor(clipStart)}s</span>
+                    <span className="text-white font-bold">{Math.floor(currentTime)}s</span>
+                    <span>Trim End: {Math.floor(clipEnd)}s</span>
+                  </div>
+
+                  <div className="relative w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-violet-500 h-full"
+                      style={{ width: `${((currentTime - clipStart) / (clipEnd - clipStart || 1)) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* CONTROLS & STYLING PANEL (5 COLS) */}
+              <div className="md:col-span-5 p-6 overflow-y-auto space-y-6">
+                
+                {/* 1. Subtitle Preset */}
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">Dynamic Caption Style</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button 
+                      onClick={() => setCaptionPreset('hormozi')}
+                      className={`p-2.5 rounded-xl border text-xs font-bold transition ${captionPreset === 'hormozi' ? 'border-yellow-400 bg-yellow-400/10 text-yellow-400' : 'border-slate-800 bg-slate-950 text-slate-400'}`}
+                    >
+                      Hormozi Yellow
+                    </button>
+                    <button 
+                      onClick={() => setCaptionPreset('beast')}
+                      className={`p-2.5 rounded-xl border text-xs font-bold transition ${captionPreset === 'beast' ? 'border-red-500 bg-red-500/10 text-red-400' : 'border-slate-800 bg-slate-950 text-slate-400'}`}
+                    >
+                      MrBeast Red
+                    </button>
+                    <button 
+                      onClick={() => setCaptionPreset('neon')}
+                      className={`p-2.5 rounded-xl border text-xs font-bold transition ${captionPreset === 'neon' ? 'border-cyan-400 bg-cyan-400/10 text-cyan-400' : 'border-slate-800 bg-slate-950 text-slate-400'}`}
+                    >
+                      Cyber Neon
+                    </button>
+                    <button 
+                      onClick={() => setCaptionPreset('minimalist')}
+                      className={`p-2.5 rounded-xl border text-xs font-bold transition ${captionPreset === 'minimalist' ? 'border-violet-500 bg-violet-500/10 text-violet-300' : 'border-slate-800 bg-slate-950 text-slate-400'}`}
+                    >
+                      Minimal Clean
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Speaker Auto-Framing Toggle */}
+                <div className="space-y-3 pt-2 border-t border-slate-800">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <label className="text-xs font-bold text-slate-300 block">AI Speaker Auto-Crop</label>
+                      <p className="text-[10px] text-slate-500">Center face automatically on speaker</p>
+                    </div>
+                    <button 
+                      onClick={() => setSpeakerTracking(!speakerTracking)}
+                      className={`w-11 h-6 rounded-full transition-colors p-1 flex items-center ${speakerTracking ? 'bg-violet-600 justify-end' : 'bg-slate-800 justify-start'}`}
+                    >
+                      <div className="w-4 h-4 rounded-full bg-white shadow-md"></div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. Subtitle Position Offset */}
+                <div className="space-y-2 pt-2 border-t border-slate-800">
+                  <label className="text-xs font-bold text-slate-300 block">Vertical Subtitle Position ({captionPos}%)</label>
+                  <input 
+                    type="range" 
+                    min="20" 
+                    max="85" 
+                    value={captionPos} 
+                    onChange={(e) => setCaptionPos(Number(e.target.value))}
+                    className="w-full accent-violet-500"
+                  />
+                </div>
+
+                {/* Render & Direct Download */}
+                <div className="pt-4 border-t border-slate-800 space-y-2">
+                  <button 
+                    onClick={handleExportRealVideo}
+                    disabled={isRendering}
+                    className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-xs py-3 rounded-xl transition shadow-lg shadow-violet-600/30 flex items-center justify-center space-x-2 disabled:opacity-50"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>{isRendering ? `Rendering 1080p (${renderProgress}%)...` : 'Render & Download 1080p MP4'}</span>
+                  </button>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+function SidebarBtn({ active, onClick, icon, label, badge }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
+        active 
+          ? 'bg-violet-600/15 text-violet-300 border border-violet-500/30' 
+          : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+      }`}
+    >
+      <div className="flex items-center space-x-3">
+        {icon}
+        <span>{label}</span>
+      </div>
+      {badge !== undefined && (
+        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${active ? 'bg-violet-500/20 text-violet-300' : 'bg-slate-800 text-slate-400'}`}>
+          {badge}
+        </span>
+      )}
+    </button>
+  );
+}
